@@ -34,6 +34,14 @@
       "removed_examples": []
     },
     "difficulty_bucket": "Five deterministic proxy buckets from prompt length, LaTeX operator count, structural math terms, and answer complexity",
+    "validation_split": {
+      "method": "SHA-256 of stable DAPO UUID mapped uniformly to [0,1)",
+      "fraction": 0.05,
+      "counts": {
+        "train": 14158,
+        "validation": 724
+      }
+    },
     "filter_counts": {
       "duplicate_train_problem": 2118,
       "kept": 14882
@@ -50,7 +58,7 @@
     "train": {
       "path": "data/real_math_train.jsonl",
       "rows": 14882,
-      "sha256": "42b93b53ca56309b3fdb23d2ee7469bf0d5c71d2adbfae52511b3a5da2398d3c"
+      "sha256": "b528c45ed8a7a9dc6c71bfc32bd19b5e460adb4a0f985c9ba92ef3bd9a8cb60f"
     },
     "eval": {
       "path": "data/real_math_eval.jsonl",

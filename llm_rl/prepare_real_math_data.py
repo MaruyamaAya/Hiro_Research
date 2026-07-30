@@ -157,6 +157,7 @@ def load_dapo(
     eval_ngrams: list[tuple[str, set[str]]],
     inverted_index: dict[str, set[int]],
     near_duplicate_threshold: float,
+    validation_fraction: float,
 ) -> tuple[list[dict[str, Any]], Counter, list[dict[str, Any]]]:
     rows = []
     stats: Counter = Counter()
@@ -198,6 +199,8 @@ def load_dapo(
             stats["empty_answer"] += 1
             continue
         index = str(raw["extra_info"]["index"])
+        split_value = int(hashlib.sha256(index.encode()).hexdigest()[:8], 16) / 2**32
+        split = "validation" if split_value < validation_fraction else "train"
         rows.append(
             {
                 "id": f"dapo:{index}",
@@ -210,7 +213,7 @@ def load_dapo(
                     {"role": "user", "content": problem},
                 ],
                 "answer": answer,
-                "split": "train",
+                "split": split,
             }
         )
     stats["kept"] = len(rows)
@@ -234,6 +237,7 @@ def main() -> None:
     parser.add_argument("--eval-output", default="data/real_math_eval.jsonl")
     parser.add_argument("--manifest", default="data/manifests/real_math_manifest.json")
     parser.add_argument("--near-duplicate-threshold", type=float, default=0.80)
+    parser.add_argument("--validation-fraction", type=float, default=0.05)
     args = parser.parse_args()
 
     dapo_path = Path(args.dapo)
@@ -254,6 +258,7 @@ def main() -> None:
         eval_ngrams,
         inverted_index,
         args.near_duplicate_threshold,
+        args.validation_fraction,
     )
 
     train_count, train_sha = write_jsonl(Path(args.train_output), train_rows)
@@ -299,6 +304,11 @@ def main() -> None:
                 "Five deterministic proxy buckets from prompt length, LaTeX "
                 "operator count, structural math terms, and answer complexity"
             ),
+            "validation_split": {
+                "method": "SHA-256 of stable DAPO UUID mapped uniformly to [0,1)",
+                "fraction": args.validation_fraction,
+                "counts": dict(Counter(x["split"] for x in train_rows)),
+            },
             "filter_counts": dict(filter_stats),
             "train_bucket_counts": dict(
                 sorted(Counter(x["difficulty"] for x in train_rows).items())

@@ -10,6 +10,7 @@ and provenance records exist.
   model-file hashes stored in every run directory.
 - Training: prepared DAPO-Math-17K subset recorded in
   `data/manifests/real_math_manifest.json`.
+- Calibration/selection: deterministic 5% DAPO validation split.
 - Held-out: MATH-500 and GSM8K test; no held-out prompt may enter training.
 - Primary inference budget: 1024 new tokens; secondary sensitivity budget: 2048.
 - LoRA target modules and rank are fixed across all conditions.

@@ -418,6 +418,7 @@ Current prepared counts:
 
 - 17,000 DAPO input records;
 - 14,882 unique training prompts after removing 2,118 duplicates;
+- deterministic 14,158/724 DAPO train/validation split;
 - five deterministic proxy difficulty buckets with counts 223, 4,380, 6,135,
   2,960, and 1,184;
 - 500 MATH-500 and 1,319 GSM8K held-out problems.
