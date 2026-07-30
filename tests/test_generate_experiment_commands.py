@@ -13,6 +13,7 @@ class GenerateCommandsTest(unittest.TestCase):
         lines = [x for x in output.splitlines() if x]
         self.assertEqual(len(lines), 24)
         self.assertTrue(any("dapo_hiro_seed42" in line for line in lines))
+        self.assertTrue(any("dapo_histdyn_seed42" in line for line in lines))
         self.assertTrue(any("--dynamic-sampling" in line for line in lines))
         self.assertTrue(any("--no-dynamic-sampling" in line for line in lines))
 

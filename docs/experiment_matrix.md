@@ -21,8 +21,8 @@ and provenance records exist.
 | G-U | GRPO | outcome | uniform | original family baseline |
 | D-U | Dr.GRPO | outcome | uniform | removes length/question bias |
 | A-U | DAPO | outcome | uniform | token-level baseline |
-| A-D | DAPO | outcome | dynamic correctness filtering | DAPO dynamic sampling |
-| A-H | DAPO | outcome | Hiro | primary method |
+| A-HD | DAPO | outcome | historical zero-gradient filtering | practical online approximation |
+| A-H | DAPO | outcome | Hiro + historical filtering | primary method |
 | A-C | DAPO | outcome | challenge only | Hiro ablation |
 | A-P | DAPO | outcome | progress only | Hiro ablation |
 | A-E | DAPO | outcome + effort | uniform | reward-hacking control |

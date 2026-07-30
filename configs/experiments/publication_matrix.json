@@ -17,7 +17,7 @@
     {"id": "g_u", "loss_type": "grpo", "mode": "outcome", "curriculum": "uniform", "dynamic_sampling": false},
     {"id": "dr_u", "loss_type": "dr_grpo", "mode": "outcome", "curriculum": "uniform", "dynamic_sampling": false},
     {"id": "dapo_u", "loss_type": "dapo", "mode": "outcome", "curriculum": "uniform", "dynamic_sampling": false},
-    {"id": "dapo_dyn", "loss_type": "dapo", "mode": "outcome", "curriculum": "uniform", "dynamic_sampling": true},
+    {"id": "dapo_histdyn", "loss_type": "dapo", "mode": "outcome", "curriculum": "uniform", "dynamic_sampling": true},
     {"id": "dapo_hiro", "loss_type": "dapo", "mode": "outcome", "curriculum": "hiro", "dynamic_sampling": true},
     {"id": "dapo_challenge", "loss_type": "dapo", "mode": "outcome", "curriculum": "challenge", "dynamic_sampling": true},
     {"id": "dapo_progress", "loss_type": "dapo", "mode": "outcome", "curriculum": "progress", "dynamic_sampling": true},
