@@ -402,6 +402,8 @@ Current prepared counts:
 
 - 17,000 DAPO input records;
 - 14,882 unique training prompts after removing 2,118 duplicates;
+- five deterministic proxy difficulty buckets with counts 223, 4,380, 6,135,
+  2,960, and 1,184;
 - 500 MATH-500 and 1,319 GSM8K held-out problems.
 
 All 14,882 DAPO reference answers pass the current verifier when wrapped in the
@@ -469,9 +471,11 @@ The initial synchronized implementation is complete locally and maintains:
 - sample coverage.
 
 These statistics produce prompt sampling probabilities and are saved inside
-every checkpoint. It still needs an eight-GPU integration test, deterministic
-resume test on the actual TRL stack, and scientifically meaningful difficulty
-buckets for DAPO rather than the source's single `MATH` label.
+every checkpoint. DAPO now has five deterministic proxy difficulty buckets,
+but they must be validated against base-model pass rates and replaced or
+recalibrated if they are not monotonic. The implementation still needs an
+eight-GPU integration test and deterministic resume test on the actual TRL
+stack.
 
 ### Step 6: execute evaluation before long training
 

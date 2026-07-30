@@ -28,6 +28,38 @@ def text_hash(text: str) -> str:
     return hashlib.sha256(canonical_text(text).encode()).hexdigest()
 
 
+def heuristic_difficulty_bucket(problem: str, answer: str) -> str:
+    """Deterministic proxy buckets until source-native difficulty is available."""
+
+    canonical = canonical_text(problem)
+    words = len(canonical.split())
+    latex_ops = len(
+        re.findall(
+            r"\\(?:frac|sqrt|sum|prod|int|log|sin|cos|tan|binom|begin)|"
+            r"\^|[{}]",
+            problem,
+        )
+    )
+    structural = len(
+        re.findall(
+            r"\b(?:triangle|polynomial|probability|integer|function|sequence|"
+            r"geometry|circle|prime|divisible|matrix|complex)\b",
+            canonical,
+        )
+    )
+    answer_complexity = min(10, len(canonical_text(answer).split()))
+    score = words / 30 + latex_ops / 6 + structural / 2 + answer_complexity / 5
+    if score < 2.0:
+        return "proxy_1"
+    if score < 3.5:
+        return "proxy_2"
+    if score < 5.5:
+        return "proxy_3"
+    if score < 8.0:
+        return "proxy_4"
+    return "proxy_5"
+
+
 def write_jsonl(path: Path, rows: Iterable[dict[str, Any]]) -> tuple[int, str]:
     path.parent.mkdir(parents=True, exist_ok=True)
     digest = hashlib.sha256()
@@ -116,7 +148,8 @@ def load_dapo(path: Path, held_out_hashes: set[str]) -> tuple[list[dict[str, Any
             {
                 "id": f"dapo:{index}",
                 "source": "dapo_math_17k",
-                "difficulty": raw.get("ability", "MATH"),
+                "difficulty": heuristic_difficulty_bucket(problem, answer),
+                "ability": raw.get("ability", "MATH"),
                 "problem": problem,
                 "prompt": [
                     {"role": "system", "content": SYSTEM_PROMPT},
@@ -191,7 +224,14 @@ def main() -> None:
             "exact_decontamination": (
                 "SHA-256 over lowercased alphanumeric canonical problem text"
             ),
+            "difficulty_bucket": (
+                "Five deterministic proxy buckets from prompt length, LaTeX "
+                "operator count, structural math terms, and answer complexity"
+            ),
             "filter_counts": dict(filter_stats),
+            "train_bucket_counts": dict(
+                sorted(Counter(x["difficulty"] for x in train_rows).items())
+            ),
         },
         "outputs": {
             "train": {

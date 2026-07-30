@@ -28,16 +28,24 @@
   },
   "processing": {
     "exact_decontamination": "SHA-256 over lowercased alphanumeric canonical problem text",
+    "difficulty_bucket": "Five deterministic proxy buckets from prompt length, LaTeX operator count, structural math terms, and answer complexity",
     "filter_counts": {
       "duplicate_train_problem": 2118,
       "kept": 14882
+    },
+    "train_bucket_counts": {
+      "proxy_1": 223,
+      "proxy_2": 4380,
+      "proxy_3": 6135,
+      "proxy_4": 2960,
+      "proxy_5": 1184
     }
   },
   "outputs": {
     "train": {
       "path": "data/real_math_train.jsonl",
       "rows": 14882,
-      "sha256": "4928bcae93fd0b5a80c53d6a767e149a5753cce9db66a560f7f393af6cde41be"
+      "sha256": "42b93b53ca56309b3fdb23d2ee7469bf0d5c71d2adbfae52511b3a5da2398d3c"
     },
     "eval": {
       "path": "data/real_math_eval.jsonl",
