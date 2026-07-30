@@ -31,8 +31,10 @@ class CurriculumTest(unittest.TestCase):
         sampler = CurriculumRepeatSampler(
             list(range(4)),
             ["a", "a", "b", "b"],
+            ["0", "1", "2", "3"],
             state,
             mode="uniform",
+            dynamic_sampling=False,
             mini_repeat_count=3,
             batch_size=2,
             repeat_count=1,
@@ -48,8 +50,10 @@ class CurriculumTest(unittest.TestCase):
         first_sampler = CurriculumRepeatSampler(
             list(range(6)),
             ["a", "a", "a", "b", "b", "b"],
+            ["0", "1", "2", "3", "4", "5"],
             state,
             mode="uniform",
+            dynamic_sampling=False,
             mini_repeat_count=1,
             batch_size=2,
             seed=19,
@@ -64,8 +68,10 @@ class CurriculumTest(unittest.TestCase):
         resumed_sampler = CurriculumRepeatSampler(
             list(range(6)),
             ["a", "a", "a", "b", "b", "b"],
+            ["0", "1", "2", "3", "4", "5"],
             restored,
             mode="uniform",
+            dynamic_sampling=False,
             mini_repeat_count=1,
             batch_size=2,
             seed=19,
@@ -74,6 +80,16 @@ class CurriculumTest(unittest.TestCase):
         resumed_suffix = [next(resumed_iterator) for _ in range(4)]
         self.assertEqual(len(prefix), 2)
         self.assertEqual(original_suffix, resumed_suffix)
+
+    def test_dynamic_sampling_downweights_zero_gradient_prompt(self) -> None:
+        state = CurriculumState(["a"])
+        for _ in range(10):
+            state.update("a", [1, 1, 1, 1], zero_gradient=True, prompt_id="stale")
+            state.update("a", [1, 0, 1, 0], zero_gradient=False, prompt_id="useful")
+        self.assertLess(
+            state.prompt_dynamic_weight("stale"),
+            state.prompt_dynamic_weight("useful"),
+        )
 
 
 if __name__ == "__main__":

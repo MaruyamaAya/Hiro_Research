@@ -13,6 +13,7 @@ class CurriculumCheckpointCallback(TrainerCallback):
         self.curriculum_state = curriculum_state
 
     def on_save(self, args: Any, state: Any, control: Any, **kwargs: Any):
-        path = Path(args.output_dir) / f"checkpoint-{state.global_step}"
-        self.curriculum_state.save(path / "curriculum_state.json")
+        if state.is_world_process_zero:
+            path = Path(args.output_dir) / f"checkpoint-{state.global_step}"
+            self.curriculum_state.save(path / "curriculum_state.json")
         return control

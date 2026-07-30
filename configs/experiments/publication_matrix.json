@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "seeds": [42, 31415, 271828],
+  "shared": {
+    "max_steps": 1000,
+    "save_steps": 50,
+    "logging_steps": 1,
+    "max_completion_length": 1024,
+    "per_device_batch_size": 1,
+    "gradient_accumulation_steps": 2,
+    "num_generations": 8,
+    "epsilon": 0.2,
+    "overlong_buffer": 256,
+    "overlong_penalty": 1.0
+  },
+  "conditions": [
+    {"id": "g_u", "loss_type": "grpo", "mode": "outcome", "curriculum": "uniform", "dynamic_sampling": false},
+    {"id": "dr_u", "loss_type": "dr_grpo", "mode": "outcome", "curriculum": "uniform", "dynamic_sampling": false},
+    {"id": "dapo_u", "loss_type": "dapo", "mode": "outcome", "curriculum": "uniform", "dynamic_sampling": false},
+    {"id": "dapo_dyn", "loss_type": "dapo", "mode": "outcome", "curriculum": "uniform", "dynamic_sampling": true},
+    {"id": "dapo_hiro", "loss_type": "dapo", "mode": "outcome", "curriculum": "hiro", "dynamic_sampling": true},
+    {"id": "dapo_challenge", "loss_type": "dapo", "mode": "outcome", "curriculum": "challenge", "dynamic_sampling": true},
+    {"id": "dapo_progress", "loss_type": "dapo", "mode": "outcome", "curriculum": "progress", "dynamic_sampling": true},
+    {"id": "dapo_effort", "loss_type": "dapo", "mode": "effort", "curriculum": "uniform", "dynamic_sampling": true}
+  ]
+}

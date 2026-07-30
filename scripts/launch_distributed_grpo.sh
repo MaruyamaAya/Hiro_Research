@@ -23,6 +23,11 @@ env | sort > "$RUN_DIR/environment.txt"
 nvidia-smi -q > "$RUN_DIR/nvidia_smi_at_launch.txt"
 cp -a "$ROOT/llm_rl" "$ROOT/configs" "$ROOT/docs" "$ROOT/scripts" \
     "$RUN_DIR/code_snapshot/" 2>/dev/null || true
+git -C "$ROOT" rev-parse HEAD > "$RUN_DIR/git_commit.txt" 2>/dev/null || true
+git -C "$ROOT" diff --binary > "$RUN_DIR/uncommitted.patch" 2>/dev/null || true
+if [[ -f "$ROOT/data/manifests/real_math_manifest.json" ]]; then
+    cp "$ROOT/data/manifests/real_math_manifest.json" "$RUN_DIR/"
+fi
 
 cd "$ROOT"
 DATA="${HIRO_TRAIN_DATA:-$RUN_DIR/math_curriculum.jsonl}"
@@ -30,6 +35,7 @@ if [[ -z "${HIRO_TRAIN_DATA:-}" ]]; then
     python3 -m llm_rl.generate_math_curriculum \
         --output "$DATA" --per-level 500
 fi
+shasum -a 256 "$DATA" > "$RUN_DIR/train_data.sha256"
 
 exec "$ROOT/scripts/with_gpu_hold.sh" \
     "$PYTHON" -m torch.distributed.run \

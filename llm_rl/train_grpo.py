@@ -86,9 +86,11 @@ class RewardState:
         for rank_records in gathered:
             for sample_id, bucket, correct in rank_records:
                 groups.setdefault((sample_id, bucket), []).append(correct)
-        for (_, bucket), outcomes in sorted(groups.items()):
+        for (sample_id, bucket), outcomes in sorted(groups.items()):
             zero_gradient = all(x == outcomes[0] for x in outcomes)
-            self.curriculum_state.update(bucket, outcomes, zero_gradient)
+            self.curriculum_state.update(
+                bucket, outcomes, zero_gradient, prompt_id=sample_id
+            )
         rank = (
             torch.distributed.get_rank()
             if torch.distributed.is_available() and torch.distributed.is_initialized()
@@ -105,6 +107,12 @@ def main() -> None:
         "--curriculum",
         choices=["uniform", "challenge", "progress", "hiro"],
         default="uniform",
+    )
+    parser.add_argument(
+        "--dynamic-sampling",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Downweight prompts whose synchronized rollout groups have zero variance.",
     )
     parser.add_argument(
         "--loss-type",
@@ -234,11 +242,13 @@ def main() -> None:
         peft_config=lora,
         curriculum_state=curriculum_state,
         curriculum_mode=args.curriculum,
+        dynamic_sampling=args.dynamic_sampling,
         callbacks=[CurriculumCheckpointCallback(curriculum_state)],
     )
     trainer.train(resume_from_checkpoint=args.resume_from_checkpoint)
     trainer.save_model(Path(args.output) / "final")
-    curriculum_state.save(Path(args.output) / "final" / "curriculum_state.json")
+    if trainer.is_world_process_zero():
+        curriculum_state.save(Path(args.output) / "final" / "curriculum_state.json")
 
 
 if __name__ == "__main__":

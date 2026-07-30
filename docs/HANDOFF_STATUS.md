@@ -497,6 +497,21 @@ state and has a deterministic continuation test. The custom trainer also
 preserves `id`, `answer`, and `bucket` through TRL's remove-unused-columns pass.
 An eight-GPU validation on the actual remote stack is still required.
 
+Prompt-level DAPO-style dynamic sampling is now implemented independently from
+the bucket curriculum. Each prompt tracks synchronized informative versus
+all-correct/all-wrong groups; historically zero-gradient prompts are
+downweighted with a nonzero exploration floor. This allows uniform+DAPO
+dynamic sampling and Hiro+DAPO dynamic sampling to be compared without
+conflating the two mechanisms.
+
+The frozen execution matrix is in `configs/experiments/`:
+
+- eight conditions for integration and calibration;
+- 24 final runs (eight conditions × three seeds);
+- generated shell commands;
+- an artifact audit script that requires launch metadata, final adapter,
+  curriculum state, and evaluation output for every run.
+
 ### Step 6: execute evaluation before long training
 
 The evaluator is implemented. Run the base model and pilot checkpoints on the

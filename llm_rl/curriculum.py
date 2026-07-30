@@ -32,6 +32,9 @@ class CurriculumState:
         self.previous_window = {bucket: 0.5 for bucket in self.buckets}
         self.zero_gradient_groups = defaultdict(int)
         self.groups = defaultdict(int)
+        self.prompt_groups = defaultdict(int)
+        self.prompt_zero_gradient_groups = defaultdict(int)
+        self.prompt_last_informative: dict[str, bool] = {}
         self.sampler_generator_state: list[int] | None = None
         self.sampler_draws = 0
 
@@ -40,6 +43,7 @@ class CurriculumState:
         bucket: str,
         outcomes: Iterable[float],
         zero_gradient: bool = False,
+        prompt_id: str | None = None,
     ) -> None:
         bucket = str(bucket)
         values = [float(x) for x in outcomes]
@@ -54,6 +58,11 @@ class CurriculumState:
         self.correct[bucket] += int(sum(values))
         self.groups[bucket] += 1
         self.zero_gradient_groups[bucket] += int(zero_gradient)
+        if prompt_id is not None:
+            prompt_id = str(prompt_id)
+            self.prompt_groups[prompt_id] += 1
+            self.prompt_zero_gradient_groups[prompt_id] += int(zero_gradient)
+            self.prompt_last_informative[prompt_id] = not zero_gradient
 
     def pass_rate(self, bucket: str) -> float:
         values = self.recent.get(str(bucket))
@@ -105,6 +114,27 @@ class CurriculumState:
             for bucket, probability in probabilities.items()
         }
 
+    def prompt_dynamic_weight(
+        self,
+        prompt_id: str,
+        exploration_floor: float = 0.05,
+        prior_strength: float = 2.0,
+    ) -> float:
+        """Estimate whether a prompt is likely to produce a nonzero GRPO group.
+
+        DAPO discards all-correct/all-wrong groups. We cannot know a group's
+        outcome before rollout, so the sampler uses synchronized historical
+        group informativeness with a nonzero exploration floor.
+        """
+
+        prompt_id = str(prompt_id)
+        groups = self.prompt_groups[prompt_id]
+        zero = self.prompt_zero_gradient_groups[prompt_id]
+        informative_rate = (groups - zero + prior_strength * 0.5) / (
+            groups + prior_strength
+        )
+        return exploration_floor + (1.0 - exploration_floor) * informative_rate
+
     def state_dict(self) -> dict[str, Any]:
         return {
             "buckets": list(self.buckets),
@@ -117,6 +147,9 @@ class CurriculumState:
             "previous_window": self.previous_window,
             "zero_gradient_groups": dict(self.zero_gradient_groups),
             "groups": dict(self.groups),
+            "prompt_groups": dict(self.prompt_groups),
+            "prompt_zero_gradient_groups": dict(self.prompt_zero_gradient_groups),
+            "prompt_last_informative": self.prompt_last_informative,
             "sampler_generator_state": self.sampler_generator_state,
             "sampler_draws": self.sampler_draws,
         }
@@ -142,6 +175,21 @@ class CurriculumState:
             obj.groups[key] = int(state["groups"].get(key, 0))
         obj.sampler_generator_state = state.get("sampler_generator_state")
         obj.sampler_draws = int(state.get("sampler_draws", 0))
+        obj.prompt_groups.update(
+            {str(key): int(value) for key, value in state.get("prompt_groups", {}).items()}
+        )
+        obj.prompt_zero_gradient_groups.update(
+            {
+                str(key): int(value)
+                for key, value in state.get("prompt_zero_gradient_groups", {}).items()
+            }
+        )
+        obj.prompt_last_informative.update(
+            {
+                str(key): bool(value)
+                for key, value in state.get("prompt_last_informative", {}).items()
+            }
+        )
         return obj
 
     def save(self, path: str | Path) -> None:
@@ -163,19 +211,25 @@ class CurriculumRepeatSampler(Sampler[int]):
         self,
         data_source: Sized,
         bucket_by_index: list[str],
+        prompt_id_by_index: list[str],
         state: CurriculumState,
         mode: str,
+        dynamic_sampling: bool,
         mini_repeat_count: int,
         batch_size: int = 1,
         repeat_count: int = 1,
         seed: int = 0,
     ):
-        if len(data_source) != len(bucket_by_index):
-            raise ValueError("bucket_by_index must align with data_source")
+        if len(data_source) != len(bucket_by_index) or len(data_source) != len(
+            prompt_id_by_index
+        ):
+            raise ValueError("bucket and prompt id arrays must align with data_source")
         self.data_source = data_source
         self.bucket_by_index = [str(x) for x in bucket_by_index]
+        self.prompt_id_by_index = [str(x) for x in prompt_id_by_index]
         self.state = state
         self.mode = mode
+        self.dynamic_sampling = dynamic_sampling
         self.mini_repeat_count = mini_repeat_count
         self.batch_size = batch_size
         self.repeat_count = repeat_count
@@ -198,7 +252,14 @@ class CurriculumRepeatSampler(Sampler[int]):
             per_index_weights = torch.tensor(
                 [
                     weights_by_bucket[bucket] / len(self.indices_by_bucket[bucket])
-                    for bucket in self.bucket_by_index
+                    * (
+                        self.state.prompt_dynamic_weight(prompt_id)
+                        if self.dynamic_sampling
+                        else 1.0
+                    )
+                    for bucket, prompt_id in zip(
+                        self.bucket_by_index, self.prompt_id_by_index
+                    )
                 ],
                 dtype=torch.double,
             )

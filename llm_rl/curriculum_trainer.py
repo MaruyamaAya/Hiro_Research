@@ -15,21 +15,26 @@ class CurriculumGRPOTrainer(GRPOTrainer):
         *args: Any,
         curriculum_state: CurriculumState,
         curriculum_mode: str,
+        dynamic_sampling: bool,
         **kwargs: Any,
     ):
         self.curriculum_state = curriculum_state
         self.curriculum_mode = curriculum_mode
+        self.dynamic_sampling = dynamic_sampling
         super().__init__(*args, **kwargs)
 
     def _get_train_sampler(self, dataset=None):
         if dataset is None:
             dataset = self.train_dataset
         buckets = [str(x) for x in dataset["bucket"]]
+        prompt_ids = [str(x) for x in dataset["id"]]
         return CurriculumRepeatSampler(
             data_source=dataset,
             bucket_by_index=buckets,
+            prompt_id_by_index=prompt_ids,
             state=self.curriculum_state,
             mode=self.curriculum_mode,
+            dynamic_sampling=self.dynamic_sampling,
             mini_repeat_count=self.num_generations,
             batch_size=self.args.generation_batch_size // self.num_generations,
             repeat_count=self.num_iterations * self.args.steps_per_generation,
