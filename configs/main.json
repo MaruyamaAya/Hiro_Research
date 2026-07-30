@@ -1,0 +1,33 @@
+{
+  "steps": 20000,
+  "seeds": 50,
+  "agents": [
+    "extrinsic",
+    "novelty",
+    "surprise",
+    "suffering",
+    "difficulty",
+    "hiro",
+    "hiro_no_lp",
+    "hiro_no_challenge",
+    "hiro_no_safety",
+    "hiro_no_external",
+    "hiro_additive_effort"
+  ],
+  "epsilon_start": 0.25,
+  "epsilon_end": 0.02,
+  "epsilon_decay_fraction": 0.7,
+  "learning_rate": 0.08,
+  "skill_bins": 21,
+  "log_every": 100,
+  "bootstrap_samples": 2000,
+  "environment": {
+    "challenge_difficulties": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
+    "initial_skill": 0.08,
+    "temperature": 0.10,
+    "skill_learning_rate": 0.0003,
+    "target_success_probability": 0.45,
+    "challenge_sigma": 0.18,
+    "damage_budget": 0.02
+  }
+}

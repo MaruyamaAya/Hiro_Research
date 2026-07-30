@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# IDE / OS
+.DS_Store
+.vscode/
+.idea/
+
+# Credentials and local connection helpers
+*.pem
+*.key
+.env
+.env.*
+*_askpass*
+*password*
+
+# Generated datasets (regenerate with the checked-in scripts)
+data/*.jsonl
+!data/README.md
+
+# Raw per-seed simulation output. Keep compact summaries in git.
+results/main/
+results/main_v2/
+results/**/runs/
+
+# Remote model artifacts and training output must stay in persistent storage,
+# not Git.
+checkpoints/
+outputs/
+remote_artifacts/
+*.safetensors
+*.pt
+*.pth
+*.bin
+
+# Logs
+*.log
+nohup.out
