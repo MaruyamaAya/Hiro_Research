@@ -27,7 +27,10 @@ def main() -> None:
                 "command": directory / "command.txt",
                 "final_adapter": directory / "checkpoints/final/adapter_config.json",
                 "curriculum": directory / "checkpoints/final/curriculum_state.json",
-                "evaluation": directory / "evaluation/all_summaries.json",
+                "evaluation": directory
+                / "evaluation"
+                / ("eval" if args.stage == "final" else "validation")
+                / "all_summaries.json",
             }
             missing = [key for key, path in required.items() if not path.exists()]
             is_complete = not missing

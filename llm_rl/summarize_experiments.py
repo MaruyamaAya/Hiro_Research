@@ -10,7 +10,7 @@ import numpy as np
 
 
 def load_run(run_dir: Path) -> dict[str, Any]:
-    summaries_path = run_dir / "evaluation/all_summaries.json"
+    summaries_path = run_dir / "evaluation/eval/all_summaries.json"
     summaries = json.loads(summaries_path.read_text())
     final = next((x for x in summaries if str(x.get("checkpoint", "")).endswith("/final")), None)
     if final is None and summaries:
@@ -51,7 +51,11 @@ def main() -> None:
     parser.add_argument("--output", required=True)
     args = parser.parse_args()
     root = Path(args.root)
-    rows = [load_run(path) for path in sorted(root.glob("final_*_seed*")) if (path / "evaluation/all_summaries.json").exists()]
+    rows = [
+        load_run(path)
+        for path in sorted(root.glob("final_*_seed*"))
+        if (path / "evaluation/eval/all_summaries.json").exists()
+    ]
     if not rows:
         raise SystemExit("No completed final runs found")
     output = Path(args.output)
