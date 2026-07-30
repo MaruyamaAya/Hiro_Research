@@ -23,6 +23,7 @@ venv/
 # Generated datasets (regenerate with the checked-in scripts)
 data/*.jsonl
 !data/README.md
+data/raw/
 
 # Raw per-seed simulation output. Keep compact summaries in git.
 results/main/

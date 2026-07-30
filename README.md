@@ -29,6 +29,18 @@ docs/HANDOFF_STATUS.md
 ```bash
 python3 -m hiro_world.run --config configs/main.json
 python3 -m hiro_world.summarize --input results/main --output results/main_summary
+python3 -m unittest discover -s tests -v
+```
+
+The real-model layer now includes a reusable symbolic/numeric answer verifier
+and a held-out evaluator for the base model and saved LoRA checkpoints:
+
+```bash
+scripts/run_math_eval.sh \
+  --data data/math_curriculum.jsonl \
+  --checkpoint-root /persistent/run/checkpoints \
+  --output /persistent/run/evaluation \
+  --max-new-tokens 1024
 ```
 
 The simulation only requires Python and NumPy. Plotting is optional and uses

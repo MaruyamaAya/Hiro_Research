@@ -45,9 +45,12 @@ verifiable reasoning data.
 ### Real-model RL prototype
 
 - `llm_rl/generate_math_curriculum.py`
+- `llm_rl/math_verifier.py`
 - `llm_rl/train_grpo.py`
+- `llm_rl/evaluate_checkpoints.py`
 - `scripts/launch_distributed_grpo.sh`
 - `scripts/run_grpo.sh`
+- `scripts/run_math_eval.sh`
 
 ### GPU lifecycle
 
@@ -343,17 +346,72 @@ Needed:
 - report clipped ratio and terminated length;
 - evaluate accuracy under a fixed inference token budget.
 
-### 6.6 Evaluation is not implemented yet
+### 6.6 Evaluation is implemented but has not yet run remotely
 
-A proper held-out evaluator is required before long training. It should:
+A first held-out evaluator now exists in `llm_rl/evaluate_checkpoints.py`. It:
 
-- load base or LoRA checkpoints;
-- run fixed prompts and seeds;
-- parse boxed/numeric answers robustly;
-- report pass@1 and pass@k;
-- stratify by source and difficulty;
-- measure response length, truncation, format validity, and reward hacking;
-- compare every saved checkpoint, not only `final`.
+- loads the base model or saved LoRA checkpoints;
+- runs fixed prompts and deterministic per-sample seeds;
+- uses the shared symbolic/numeric answer verifier;
+- reports empirical pass@1 and pass@k;
+- stratifies by source and difficulty;
+- measures response length, truncation, format validity, and verifier status;
+- discovers every `checkpoint-*` directory plus `final`.
+
+It still needs to be executed against the base model and all four pilot runs on
+the remote nodes. Realistic held-out datasets and explicit reward-hacking audit
+sets are also still required.
+
+### 6.7 Robust answer verification is now available
+
+`llm_rl/math_verifier.py` supports:
+
+- explicit `<answer>...</answer>` extraction;
+- balanced `\boxed{...}` extraction;
+- integer, decimal, fraction, and simple symbolic equivalence;
+- common LaTeX fractions and square roots;
+- explicit `correct`, `incorrect`, `no_answer`, `invalid`, and `ambiguous`
+  outcomes;
+- rejection of unsupported identifiers and implicit number scavenging from
+  reasoning text.
+
+The GRPO reward now uses this shared verifier. Deterministic unit tests are in
+`tests/`.
+
+### 6.8 Real-data preparation and synchronized curriculum are implemented locally
+
+The local checkout now includes:
+
+- `scripts/download_real_math_data.sh`, which downloads pinned MATH-500 and
+  GSM8K test data and retrieves the first 17,000 DAPO-Math-17K records;
+- `llm_rl/prepare_real_math_data.py`, which normalizes all sources to the common
+  prompt/answer schema, removes exact duplicate training prompts, and performs
+  exact canonical-text decontamination against held-out prompts;
+- `data/manifests/real_math_manifest.json`, recording revisions, licenses,
+  SHA-256 hashes, row counts, and filtering statistics;
+- `llm_rl/curriculum.py`, implementing bucket-level attempts, pass rates,
+  previous-window rates, signed learning progress, zero-gradient group counts,
+  coverage, checkpoint serialization, and weighted sampling;
+- `llm_rl/curriculum_trainer.py`, integrating the dynamic sampler with TRL's
+  repeated-prompt grouping;
+- distributed reward-statistic synchronization using
+  `torch.distributed.all_gather_object`;
+- exact curriculum-state saving in every checkpoint and restoration on resume.
+
+Current prepared counts:
+
+- 17,000 DAPO input records;
+- 14,882 unique training prompts after removing 2,118 duplicates;
+- 500 MATH-500 and 1,319 GSM8K held-out problems.
+
+All 14,882 DAPO reference answers pass the current verifier when wrapped in the
+required answer format. MATH-500 still contains structured answer types
+(tuples, sets, text labels, base notation, and other LaTeX) that require a
+dataset-complete verifier before MATH-500 accuracy is publication-grade.
+
+At the end of the latest local session, both DevCloud SSH endpoints accepted a
+TCP connection but closed it before SSH key exchange. Therefore the new code,
+data, and evaluator have not yet been uploaded or run on the H20 nodes.
 
 ## 7. Recommended next actions
 
@@ -367,26 +425,25 @@ available.
 
 ### Step 2: obtain realistic data
 
-Acquire DAPO-Math-17K/OpenR1-Math/NuminaMath plus held-out evaluation sets.
-Create a manifest with:
+An initial pinned DAPO-Math-17K + MATH-500 + GSM8K bundle and manifest now
+exists locally. Next:
 
-- source URL/repository;
-- revision;
-- SHA-256;
-- license;
-- original split;
-- filtered/decontaminated count.
+- restore remote access and upload/regenerate the data on persistent storage;
+- add semantic/near-duplicate decontamination, not only exact canonical hashes;
+- consider adding OpenR1-Math/NuminaMath only after licensing and overlap
+  auditing;
+- manually audit a stratified sample and all verifier-invalid references.
 
-### Step 3: implement robust answer verification
+### Step 3: run and extend robust answer verification
 
-Support:
+The initial verifier and unit tests are implemented. Before realistic-data
+training:
 
-- `\boxed{...}`;
-- integer, decimal, fraction, and simple symbolic equivalence;
-- normalization without accepting prompt leakage;
-- an explicit invalid/ambiguous category.
-
-Use deterministic unit tests.
+- run it over each acquired dataset and manually inspect all invalid/ambiguous
+  classes;
+- add dataset-specific answer formats only through regression tests;
+- keep explicit extraction so prompt/intermediate-number leakage is not
+  accepted.
 
 ### Step 4: implement paper-aligned baselines
 
@@ -402,7 +459,7 @@ At minimum:
 
 ### Step 5: implement synchronized Hiro curriculum
 
-Maintain bucket-level:
+The initial synchronized implementation is complete locally and maintains:
 
 - attempt count;
 - recent pass rate;
@@ -411,13 +468,16 @@ Maintain bucket-level:
 - zero-gradient group rate;
 - sample coverage.
 
-Use these statistics to produce prompt sampling probabilities. Save curriculum
-state inside every checkpoint so resume is exact.
+These statistics produce prompt sampling probabilities and are saved inside
+every checkpoint. It still needs an eight-GPU integration test, deterministic
+resume test on the actual TRL stack, and scientifically meaningful difficulty
+buckets for DAPO rather than the source's single `MATH` label.
 
-### Step 6: implement evaluation before long training
+### Step 6: execute evaluation before long training
 
-Run the base model and pilot checkpoints on the same held-out suite. This gives
-a baseline and catches any broken verifier before spending more GPU-hours.
+The evaluator is implemented. Run the base model and pilot checkpoints on the
+same held-out suite. This gives a baseline and catches any broken verifier
+before spending more GPU-hours.
 
 ### Step 7: short calibration, then long runs
 
@@ -471,6 +531,21 @@ NPROC=8 ./scripts/launch_distributed_grpo.sh \
 For the future synchronized curriculum implementation, resume must also restore
 the curriculum-controller state.
 
+### Evaluate base model and all checkpoints in one run
+
+```bash
+cd /root/Hiro_Research
+./scripts/run_math_eval.sh \
+  --data "${TAIJI_BASIC_OUTPUT_PATH}/hiro_rl/outcome_pilot_v2/math_curriculum.jsonl" \
+  --checkpoint-root "${TAIJI_BASIC_OUTPUT_PATH}/hiro_rl/outcome_pilot_v2/checkpoints" \
+  --output "${TAIJI_BASIC_OUTPUT_PATH}/hiro_rl/outcome_pilot_v2/evaluation" \
+  --max-new-tokens 1024 \
+  --temperature 0
+```
+
+Use a separate invocation without `--checkpoint-root` for the base model. Use
+`--samples K --temperature 0.8` for empirical pass@k sampling.
+
 ## 9. Security and repository hygiene
 
 - SSH passwords and local askpass helpers are not stored in this repository.
@@ -494,8 +569,7 @@ It does **not yet** have:
 - realistic primary training data;
 - a synchronized history-aware Hiro curriculum;
 - a faithful dynamic-sampling DAPO implementation;
-- robust symbolic verification;
-- a held-out evaluation harness;
+- remote results from the new symbolic verifier/evaluation harness;
 - multi-seed evidence that Hiro improves real-model RL.
 
 Those missing items are the next milestone and should be completed before

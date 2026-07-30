@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "sources": {
+    "dapo_math_17k": {
+      "repository": "BytedTsinghua-SIA/DAPO-Math-17k",
+      "revision": "65877096c24ffa7abc4e4fa5edb95cf3413a5674",
+      "license": "apache-2.0",
+      "original_split": "train",
+      "input_path": "data/raw/dapo-math-17k-api.jsonl",
+      "input_sha256": "3019ded4e00715e03eb858cef4613aafbb6d4bcbb3dac8fae1e61fe778af22c1",
+      "selection": "first 17,000 rows from datasets-server rows API"
+    },
+    "math500": {
+      "repository": "HuggingFaceH4/MATH-500",
+      "revision": "6e4ed1a2a79af7d8630a6b768ec859cb5af4d3be",
+      "original_split": "test",
+      "input_path": "data/raw/math-500-test.jsonl",
+      "input_sha256": "35dc41080a3680858b27fa7e0533d2d547825316fc5dafe5d316f4ccc5a06132"
+    },
+    "gsm8k": {
+      "repository": "openai/gsm8k",
+      "revision": "740312add88f781978c0658806c59bc2815b9866",
+      "license": "mit",
+      "original_split": "test",
+      "input_path": "data/raw/gsm8k-test.parquet",
+      "input_sha256": "ee7b8da9e381df27b9e3f7758a159ab2bdaa4dbaa910546cbbc47e0cb44e4f59"
+    }
+  },
+  "processing": {
+    "exact_decontamination": "SHA-256 over lowercased alphanumeric canonical problem text",
+    "filter_counts": {
+      "duplicate_train_problem": 2118,
+      "kept": 14882
+    }
+  },
+  "outputs": {
+    "train": {
+      "path": "data/real_math_train.jsonl",
+      "rows": 14882,
+      "sha256": "4928bcae93fd0b5a80c53d6a767e149a5753cce9db66a560f7f393af6cde41be"
+    },
+    "eval": {
+      "path": "data/real_math_eval.jsonl",
+      "rows": 1819,
+      "sha256": "526b672431117f8628c423963eba6f3f5506db442e8e057a89a5ea590edf9b27",
+      "source_counts": {
+        "math500": 500,
+        "gsm8k": 1319
+      }
+    }
+  }
+}

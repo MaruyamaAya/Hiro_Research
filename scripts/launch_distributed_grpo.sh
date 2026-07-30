@@ -2,8 +2,8 @@
 # Launch one node-wide GRPO job and preserve code, logs, and checkpoints.
 set -euo pipefail
 
-MODE="${1:?usage: launch_distributed_grpo.sh MODE RUN_NAME [extra train args...]}"
-RUN_NAME="${2:?usage: launch_distributed_grpo.sh MODE RUN_NAME [extra train args...]}"
+MODE="${1:?usage: launch_distributed_grpo.sh REWARD_MODE RUN_NAME [extra train args...]}"
+RUN_NAME="${2:?usage: launch_distributed_grpo.sh REWARD_MODE RUN_NAME [extra train args...]}"
 shift 2
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -25,14 +25,17 @@ cp -a "$ROOT/llm_rl" "$ROOT/configs" "$ROOT/docs" "$ROOT/scripts" \
     "$RUN_DIR/code_snapshot/" 2>/dev/null || true
 
 cd "$ROOT"
-python3 -m llm_rl.generate_math_curriculum \
-    --output "$RUN_DIR/math_curriculum.jsonl" --per-level 500
+DATA="${HIRO_TRAIN_DATA:-$RUN_DIR/math_curriculum.jsonl}"
+if [[ -z "${HIRO_TRAIN_DATA:-}" ]]; then
+    python3 -m llm_rl.generate_math_curriculum \
+        --output "$DATA" --per-level 500
+fi
 
 exec "$ROOT/scripts/with_gpu_hold.sh" \
     "$PYTHON" -m torch.distributed.run \
     --standalone --nproc_per_node="$NPROC" \
     -m llm_rl.train_grpo \
     --mode "$MODE" \
-    --data "$RUN_DIR/math_curriculum.jsonl" \
+    --data "$DATA" \
     --output "$RUN_DIR/checkpoints" \
     "$@"
