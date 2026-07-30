@@ -17,6 +17,22 @@ class CurriculumTest(unittest.TestCase):
         self.assertGreater(weights["frontier"], weights["easy"])
         self.assertGreater(weights["frontier"], weights["impossible"])
 
+    def test_progress_compares_disjoint_windows(self) -> None:
+        state = CurriculumState(["a"], window_size=4)
+        state.update("a", [0, 0, 0, 0])
+        self.assertEqual(state.previous_pass_rate("a"), 0.5)
+        state.update("a", [1, 1, 1, 1])
+        self.assertEqual(state.previous_pass_rate("a"), 0.0)
+        self.assertEqual(state.pass_rate("a"), 1.0)
+        self.assertEqual(state.progress("a"), 1.0)
+
+    def test_progress_mode_revisits_regressing_bucket(self) -> None:
+        state = CurriculumState(["stable", "regressing"], window_size=4)
+        state.update("stable", [1, 1, 1, 1, 1, 1, 1, 1])
+        state.update("regressing", [1, 1, 1, 1, 0, 0, 0, 0])
+        weights = state.sampling_weights("progress", coverage_weight=0.0)
+        self.assertGreater(weights["regressing"], weights["stable"])
+
     def test_round_trip(self) -> None:
         state = CurriculumState(["a"], window_size=4)
         state.update("a", [1, 0, 1])

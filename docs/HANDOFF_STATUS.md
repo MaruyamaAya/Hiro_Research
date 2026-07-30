@@ -498,6 +498,11 @@ state and has a deterministic continuation test. The custom trainer also
 preserves `id`, `answer`, and `bucket` through TRL's remove-unused-columns pass.
 An eight-GPU validation on the actual remote stack is still required.
 
+Learning progress now compares two disjoint rolling windows (up to 128 outcomes
+each), rather than comparing a post-update window to its immediately preceding
+value. Positive progress is prioritized, while negative progress receives a
+smaller revisit weight to detect and repair forgetting.
+
 Prompt-level **historical zero-gradient filtering** is now implemented
 independently from the bucket curriculum. Each prompt tracks synchronized
 informative versus all-correct/all-wrong groups; historically zero-gradient

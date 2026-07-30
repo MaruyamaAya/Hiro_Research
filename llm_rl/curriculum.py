@@ -26,10 +26,9 @@ class CurriculumState:
         self.challenge_bandwidth = challenge_bandwidth
         self.attempts = defaultdict(int)
         self.correct = defaultdict(int)
-        self.recent = {
-            bucket: deque(maxlen=window_size) for bucket in self.buckets
+        self.history = {
+            bucket: deque(maxlen=2 * window_size) for bucket in self.buckets
         }
-        self.previous_window = {bucket: 0.5 for bucket in self.buckets}
         self.zero_gradient_groups = defaultdict(int)
         self.groups = defaultdict(int)
         self.prompt_groups = defaultdict(int)
@@ -47,13 +46,10 @@ class CurriculumState:
     ) -> None:
         bucket = str(bucket)
         values = [float(x) for x in outcomes]
-        if bucket not in self.recent:
+        if bucket not in self.history:
             self.buckets = tuple(sorted(set(self.buckets) | {bucket}))
-            self.recent[bucket] = deque(maxlen=self.window_size)
-            self.previous_window[bucket] = 0.5
-        old_rate = self.pass_rate(bucket)
-        self.previous_window[bucket] = old_rate
-        self.recent[bucket].extend(values)
+            self.history[bucket] = deque(maxlen=2 * self.window_size)
+        self.history[bucket].extend(values)
         self.attempts[bucket] += len(values)
         self.correct[bucket] += int(sum(values))
         self.groups[bucket] += 1
@@ -65,18 +61,24 @@ class CurriculumState:
             self.prompt_last_informative[prompt_id] = not zero_gradient
 
     def pass_rate(self, bucket: str) -> float:
-        values = self.recent.get(str(bucket))
-        return sum(values) / len(values) if values else 0.5
+        values = list(self.history.get(str(bucket), ()))
+        recent = values[-self.window_size :]
+        return sum(recent) / len(recent) if recent else 0.5
+
+    def previous_pass_rate(self, bucket: str) -> float:
+        values = list(self.history.get(str(bucket), ()))
+        previous = values[-2 * self.window_size : -self.window_size]
+        return sum(previous) / len(previous) if previous else 0.5
 
     def progress(self, bucket: str) -> float:
-        bucket = str(bucket)
-        return self.pass_rate(bucket) - self.previous_window.get(bucket, 0.5)
+        return self.pass_rate(bucket) - self.previous_pass_rate(bucket)
 
     def sampling_weights(
         self,
         mode: str,
         min_probability: float = 0.02,
         progress_weight: float = 1.0,
+        negative_progress_weight: float = 0.5,
         coverage_weight: float = 0.15,
     ) -> dict[str, float]:
         if not self.buckets:
@@ -89,16 +91,22 @@ class CurriculumState:
                 -((ability - self.target_success) ** 2)
                 / (2 * self.challenge_bandwidth**2)
             )
-            positive_progress = max(0.0, self.progress(bucket))
+            progress = self.progress(bucket)
+            positive_progress = max(0.0, progress)
+            regression = max(0.0, -progress)
             coverage = 1.0 - self.attempts[bucket] / max_attempts
             if mode == "uniform":
                 score = 1.0
             elif mode == "challenge":
                 score = challenge
             elif mode == "progress":
-                score = positive_progress
+                score = positive_progress + negative_progress_weight * regression
             elif mode == "hiro":
-                score = challenge + progress_weight * positive_progress
+                score = (
+                    challenge
+                    + progress_weight * positive_progress
+                    + negative_progress_weight * regression
+                )
             else:
                 raise ValueError(f"Unknown curriculum mode: {mode}")
             scores[bucket] = max(0.0, score + coverage_weight * coverage)
@@ -143,8 +151,7 @@ class CurriculumState:
             "challenge_bandwidth": self.challenge_bandwidth,
             "attempts": dict(self.attempts),
             "correct": dict(self.correct),
-            "recent": {key: list(value) for key, value in self.recent.items()},
-            "previous_window": self.previous_window,
+            "history": {key: list(value) for key, value in self.history.items()},
             "zero_gradient_groups": dict(self.zero_gradient_groups),
             "groups": dict(self.groups),
             "prompt_groups": dict(self.prompt_groups),
@@ -165,10 +172,12 @@ class CurriculumState:
         for key in obj.buckets:
             obj.attempts[key] = int(state["attempts"].get(key, 0))
             obj.correct[key] = int(state["correct"].get(key, 0))
-            obj.recent[key].extend(state["recent"].get(key, []))
-            obj.previous_window[key] = float(
-                state["previous_window"].get(key, 0.5)
-            )
+            history = state.get("history", {}).get(key)
+            if history is None:
+                # Backward compatibility with checkpoints written before two
+                # disjoint rolling windows were introduced.
+                history = state.get("recent", {}).get(key, [])
+            obj.history[key].extend(history)
             obj.zero_gradient_groups[key] = int(
                 state["zero_gradient_groups"].get(key, 0)
             )
