@@ -378,6 +378,21 @@ sets are also still required.
 The GRPO reward now uses this shared verifier. Deterministic unit tests are in
 `tests/`.
 
+The verifier has since been extended for MATH-500 answer types including:
+
+- tuples, finite sets, plus/minus solution sets, intervals, and unions;
+- matrices and vectors;
+- equations and membership relations;
+- malformed/common LaTeX fractions, radicals, trigonometric functions, and
+  constants;
+- base-annotated integers, units, currency, degree marks, text labels, and
+  multiple-choice labels.
+
+`llm_rl/audit_verifier.py` currently reports 100% reference self-coverage over
+16,701 prepared train/evaluation rows and zero false accepts over 50,103
+deterministic negative controls. This is a regression/coverage audit, not a
+substitute for manually labeled adversarial false-positive evaluation.
+
 ### 6.8 Real-data preparation and synchronized curriculum are implemented locally
 
 The local checkout now includes:
@@ -386,7 +401,8 @@ The local checkout now includes:
   GSM8K test data and retrieves the first 17,000 DAPO-Math-17K records;
 - `llm_rl/prepare_real_math_data.py`, which normalizes all sources to the common
   prompt/answer schema, removes exact duplicate training prompts, and performs
-  exact canonical-text decontamination against held-out prompts;
+  exact canonical-text decontamination plus Jaccard near-duplicate filtering
+  over canonical token 5-grams against held-out prompts;
 - `data/manifests/real_math_manifest.json`, recording revisions, licenses,
   SHA-256 hashes, row counts, and filtering statistics;
 - `llm_rl/curriculum.py`, implementing bucket-level attempts, pass rates,
@@ -406,10 +422,8 @@ Current prepared counts:
   2,960, and 1,184;
 - 500 MATH-500 and 1,319 GSM8K held-out problems.
 
-All 14,882 DAPO reference answers pass the current verifier when wrapped in the
-required answer format. MATH-500 still contains structured answer types
-(tuples, sets, text labels, base notation, and other LaTeX) that require a
-dataset-complete verifier before MATH-500 accuracy is publication-grade.
+All 14,882 DAPO, 500 MATH-500, and 1,319 GSM8K references now pass the current
+verifier when wrapped in the required answer format.
 
 At the end of the latest local session, both DevCloud SSH endpoints accepted a
 TCP connection but closed it before SSH key exchange. Therefore the new code,
@@ -431,7 +445,8 @@ An initial pinned DAPO-Math-17K + MATH-500 + GSM8K bundle and manifest now
 exists locally. Next:
 
 - restore remote access and upload/regenerate the data on persistent storage;
-- add semantic/near-duplicate decontamination, not only exact canonical hashes;
+- manually inspect the near-duplicate candidates and add a semantic embedding
+  audit if exact/5-gram filtering is insufficient;
 - consider adding OpenR1-Math/NuminaMath only after licensing and overlap
   auditing;
 - manually audit a stratified sample and all verifier-invalid references.
@@ -476,6 +491,11 @@ but they must be validated against base-model pass rates and replaced or
 recalibrated if they are not monotonic. The implementation still needs an
 eight-GPU integration test and deterministic resume test on the actual TRL
 stack.
+
+Local sampler resume now serializes and restores the exact PyTorch generator
+state and has a deterministic continuation test. The custom trainer also
+preserves `id`, `answer`, and `bucket` through TRL's remove-unused-columns pass.
+An eight-GPU validation on the actual remote stack is still required.
 
 ### Step 6: execute evaluation before long training
 

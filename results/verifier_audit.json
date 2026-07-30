@@ -1,0 +1,22 @@
+{
+  "rows": 16701,
+  "reference_status_counts": {
+    "correct": 16701
+  },
+  "reference_coverage": 1.0,
+  "negative_cases": 50103,
+  "negative_false_accepts": 0,
+  "negative_false_accept_rate": 0.0,
+  "by_source": {
+    "dapo_math_17k": {
+      "correct": 14882
+    },
+    "gsm8k": {
+      "correct": 1319
+    },
+    "math500": {
+      "correct": 500
+    }
+  },
+  "failures": []
+}

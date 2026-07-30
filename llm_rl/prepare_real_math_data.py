@@ -4,7 +4,7 @@ import argparse
 import hashlib
 import json
 import re
-from collections import Counter
+from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -26,6 +26,37 @@ def canonical_text(text: str) -> str:
 
 def text_hash(text: str) -> str:
     return hashlib.sha256(canonical_text(text).encode()).hexdigest()
+
+
+def token_ngrams(text: str, n: int = 5) -> set[str]:
+    tokens = canonical_text(text).split()
+    if len(tokens) < n:
+        return {" ".join(tokens)} if tokens else set()
+    return {" ".join(tokens[i : i + n]) for i in range(len(tokens) - n + 1)}
+
+
+def near_duplicate_eval_id(
+    problem: str,
+    eval_ngrams: list[tuple[str, set[str]]],
+    inverted_index: dict[str, set[int]],
+    threshold: float,
+) -> tuple[str | None, float]:
+    grams = token_ngrams(problem)
+    if not grams:
+        return None, 0.0
+    candidates: Counter[int] = Counter()
+    for gram in grams:
+        for eval_index in inverted_index.get(gram, set()):
+            candidates[eval_index] += 1
+    best_id = None
+    best_score = 0.0
+    for eval_index in candidates:
+        eval_id, other = eval_ngrams[eval_index]
+        union = len(grams | other)
+        score = len(grams & other) / union if union else 0.0
+        if score > best_score:
+            best_id, best_score = eval_id, score
+    return (best_id, best_score) if best_score >= threshold else (None, best_score)
 
 
 def heuristic_difficulty_bucket(problem: str, answer: str) -> str:
@@ -120,9 +151,16 @@ def load_gsm8k(path: Path) -> list[dict[str, Any]]:
     return rows
 
 
-def load_dapo(path: Path, held_out_hashes: set[str]) -> tuple[list[dict[str, Any]], Counter]:
+def load_dapo(
+    path: Path,
+    held_out_hashes: set[str],
+    eval_ngrams: list[tuple[str, set[str]]],
+    inverted_index: dict[str, set[int]],
+    near_duplicate_threshold: float,
+) -> tuple[list[dict[str, Any]], Counter, list[dict[str, Any]]]:
     rows = []
     stats: Counter = Counter()
+    near_duplicates = []
     seen: set[str] = set()
     for line in path.open():
         raw = json.loads(line)
@@ -134,6 +172,22 @@ def load_dapo(path: Path, held_out_hashes: set[str]) -> tuple[list[dict[str, Any
         problem_hash = text_hash(problem)
         if problem_hash in held_out_hashes:
             stats["exact_eval_overlap"] += 1
+            continue
+        eval_id, similarity = near_duplicate_eval_id(
+            problem,
+            eval_ngrams,
+            inverted_index,
+            near_duplicate_threshold,
+        )
+        if eval_id is not None:
+            stats["near_eval_overlap"] += 1
+            near_duplicates.append(
+                {
+                    "train_id": str(raw["extra_info"]["index"]),
+                    "eval_id": eval_id,
+                    "jaccard_5gram": similarity,
+                }
+            )
             continue
         if problem_hash in seen:
             stats["duplicate_train_problem"] += 1
@@ -160,7 +214,7 @@ def load_dapo(path: Path, held_out_hashes: set[str]) -> tuple[list[dict[str, Any
             }
         )
     stats["kept"] = len(rows)
-    return rows, stats
+    return rows, stats, near_duplicates
 
 
 def sha256_file(path: Path) -> str:
@@ -179,6 +233,7 @@ def main() -> None:
     parser.add_argument("--train-output", default="data/real_math_train.jsonl")
     parser.add_argument("--eval-output", default="data/real_math_eval.jsonl")
     parser.add_argument("--manifest", default="data/manifests/real_math_manifest.json")
+    parser.add_argument("--near-duplicate-threshold", type=float, default=0.80)
     args = parser.parse_args()
 
     dapo_path = Path(args.dapo)
@@ -188,7 +243,18 @@ def main() -> None:
     gsm8k = load_gsm8k(gsm8k_path)
     eval_rows = math500 + gsm8k
     held_out_hashes = {text_hash(row["problem"]) for row in eval_rows}
-    train_rows, filter_stats = load_dapo(dapo_path, held_out_hashes)
+    eval_ngrams = [(row["id"], token_ngrams(row["problem"])) for row in eval_rows]
+    inverted_index: dict[str, set[int]] = defaultdict(set)
+    for index, (_, grams) in enumerate(eval_ngrams):
+        for gram in grams:
+            inverted_index[gram].add(index)
+    train_rows, filter_stats, near_duplicates = load_dapo(
+        dapo_path,
+        held_out_hashes,
+        eval_ngrams,
+        inverted_index,
+        args.near_duplicate_threshold,
+    )
 
     train_count, train_sha = write_jsonl(Path(args.train_output), train_rows)
     eval_count, eval_sha = write_jsonl(Path(args.eval_output), eval_rows)
@@ -224,6 +290,11 @@ def main() -> None:
             "exact_decontamination": (
                 "SHA-256 over lowercased alphanumeric canonical problem text"
             ),
+            "near_duplicate_decontamination": {
+                "metric": "Jaccard similarity over canonical token 5-grams",
+                "threshold": args.near_duplicate_threshold,
+                "removed_examples": near_duplicates,
+            },
             "difficulty_bucket": (
                 "Five deterministic proxy buckets from prompt length, LaTeX "
                 "operator count, structural math terms, and answer complexity"

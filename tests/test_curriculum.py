@@ -43,6 +43,38 @@ class CurriculumTest(unittest.TestCase):
         for start in range(0, len(values), 3):
             self.assertEqual(len(set(values[start : start + 3])), 1)
 
+    def test_sampler_resume_continues_exact_random_stream(self) -> None:
+        state = CurriculumState(["a", "b"])
+        first_sampler = CurriculumRepeatSampler(
+            list(range(6)),
+            ["a", "a", "a", "b", "b", "b"],
+            state,
+            mode="uniform",
+            mini_repeat_count=1,
+            batch_size=2,
+            seed=19,
+        )
+        iterator = iter(first_sampler)
+        prefix = [next(iterator) for _ in range(2)]
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "state.json"
+            state.save(path)
+            restored = CurriculumState.load(path)
+        original_suffix = [next(iterator) for _ in range(4)]
+        resumed_sampler = CurriculumRepeatSampler(
+            list(range(6)),
+            ["a", "a", "a", "b", "b", "b"],
+            restored,
+            mode="uniform",
+            mini_repeat_count=1,
+            batch_size=2,
+            seed=19,
+        )
+        resumed_iterator = iter(resumed_sampler)
+        resumed_suffix = [next(resumed_iterator) for _ in range(4)]
+        self.assertEqual(len(prefix), 2)
+        self.assertEqual(original_suffix, resumed_suffix)
+
 
 if __name__ == "__main__":
     unittest.main()

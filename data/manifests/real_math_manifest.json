@@ -28,6 +28,11 @@
   },
   "processing": {
     "exact_decontamination": "SHA-256 over lowercased alphanumeric canonical problem text",
+    "near_duplicate_decontamination": {
+      "metric": "Jaccard similarity over canonical token 5-grams",
+      "threshold": 0.8,
+      "removed_examples": []
+    },
     "difficulty_bucket": "Five deterministic proxy buckets from prompt length, LaTeX operator count, structural math terms, and answer complexity",
     "filter_counts": {
       "duplicate_train_problem": 2118,

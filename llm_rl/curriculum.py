@@ -32,6 +32,8 @@ class CurriculumState:
         self.previous_window = {bucket: 0.5 for bucket in self.buckets}
         self.zero_gradient_groups = defaultdict(int)
         self.groups = defaultdict(int)
+        self.sampler_generator_state: list[int] | None = None
+        self.sampler_draws = 0
 
     def update(
         self,
@@ -115,6 +117,8 @@ class CurriculumState:
             "previous_window": self.previous_window,
             "zero_gradient_groups": dict(self.zero_gradient_groups),
             "groups": dict(self.groups),
+            "sampler_generator_state": self.sampler_generator_state,
+            "sampler_draws": self.sampler_draws,
         }
 
     @classmethod
@@ -136,6 +140,8 @@ class CurriculumState:
                 state["zero_gradient_groups"].get(key, 0)
             )
             obj.groups[key] = int(state["groups"].get(key, 0))
+        obj.sampler_generator_state = state.get("sampler_generator_state")
+        obj.sampler_draws = int(state.get("sampler_draws", 0))
         return obj
 
     def save(self, path: str | Path) -> None:
@@ -175,6 +181,10 @@ class CurriculumRepeatSampler(Sampler[int]):
         self.repeat_count = repeat_count
         self.num_samples = len(data_source)
         self.generator = torch.Generator().manual_seed(seed)
+        if state.sampler_generator_state is not None:
+            self.generator.set_state(
+                torch.tensor(state.sampler_generator_state, dtype=torch.uint8)
+            )
         self.indices_by_bucket: dict[str, list[int]] = defaultdict(list)
         for index, bucket in enumerate(self.bucket_by_index):
             self.indices_by_bucket[bucket].append(index)
@@ -198,6 +208,8 @@ class CurriculumRepeatSampler(Sampler[int]):
                 replacement=True,
                 generator=self.generator,
             ).tolist()
+            self.state.sampler_draws += self.batch_size
+            self.state.sampler_generator_state = self.generator.get_state().tolist()
             for _ in range(self.repeat_count):
                 for index in chunk:
                     for _ in range(self.mini_repeat_count):

@@ -59,6 +59,34 @@ class MathVerifierTest(unittest.TestCase):
         result = verify_answer("<answer>6 - 5i</answer>", "6-5*i")
         self.assertEqual(result.status, VerificationStatus.CORRECT)
 
+    def test_tuple(self) -> None:
+        self.assertTrue(answers_equivalent(r"\left(3,\frac{\pi}{2}\right)", "(3, pi/2)"))
+
+    def test_unordered_set_and_plus_minus(self) -> None:
+        self.assertTrue(answers_equivalent(r"\{1\pm\sqrt{5},-2\}", "{-2,1+sqrt(5),1-sqrt(5)}"))
+
+    def test_interval_union(self) -> None:
+        self.assertTrue(
+            answers_equivalent(r"(-\infty,2)\cup(3,\infty)", "(-oo,2) ∪ (3,oo)")
+        )
+
+    def test_matrix(self) -> None:
+        self.assertTrue(
+            answers_equivalent(
+                r"\begin{pmatrix}-1&0\\0&-1\end{pmatrix}",
+                r"\begin{pmatrix}-1&0\\0&-1\end{pmatrix}",
+            )
+        )
+
+    def test_text_and_choice(self) -> None:
+        self.assertTrue(answers_equivalent(r"\text{Evelyn}", "evelyn"))
+        self.assertTrue(answers_equivalent(r"\text{(C)}", "C"))
+
+    def test_base_number_and_units(self) -> None:
+        self.assertTrue(answers_equivalent("52_8", "42"))
+        self.assertTrue(answers_equivalent(r"90^\circ", "90"))
+        self.assertTrue(answers_equivalent(r"\$36", "36"))
+
     def test_answer_tag_has_priority_over_reasoning_box(self) -> None:
         candidates, source = extract_answer_candidates(
             r"Intermediate \boxed{3}; <answer>4</answer>"

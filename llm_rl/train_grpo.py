@@ -16,6 +16,7 @@ from llm_rl.curriculum import CurriculumState
 from llm_rl.curriculum_callback import CurriculumCheckpointCallback
 from llm_rl.curriculum_trainer import CurriculumGRPOTrainer
 from llm_rl.math_verifier import verify_answer
+from llm_rl.rewards import soft_overlong_penalty
 
 
 class RewardState:
@@ -24,10 +25,16 @@ class RewardState:
         mode: str,
         curriculum_state: CurriculumState,
         state_output: Path,
+        max_completion_length: int,
+        overlong_buffer: int,
+        overlong_penalty: float,
     ):
         self.mode = mode
         self.curriculum_state = curriculum_state
         self.state_output = state_output
+        self.max_completion_length = max_completion_length
+        self.overlong_buffer = overlong_buffer
+        self.overlong_penalty = overlong_penalty
 
     def __call__(
         self,
@@ -35,12 +42,14 @@ class RewardState:
         answer: list[Any],
         bucket: list[str],
         id: list[str],
+        completion_ids: list[Any] | None = None,
         **_: Any,
     ) -> list[float]:
         rewards = []
         local_records = []
-        for completion, target, sample_bucket, sample_id in zip(
-            completions, answer, bucket, id
+        completion_ids = completion_ids or [None] * len(completions)
+        for completion, target, sample_bucket, sample_id, token_ids in zip(
+            completions, answer, bucket, id, completion_ids
         ):
             text = (
                 completion[-1]["content"]
@@ -56,6 +65,13 @@ class RewardState:
                 reward = correct + 0.002 * min(len(text), 800)
             else:
                 raise ValueError(self.mode)
+            if token_ids is not None and self.overlong_buffer > 0:
+                reward -= soft_overlong_penalty(
+                    len(token_ids),
+                    self.max_completion_length,
+                    self.overlong_buffer,
+                    self.overlong_penalty,
+                )
             rewards.append(float(reward))
             local_records.append((str(sample_id), str(sample_bucket), correct))
         self._synchronized_update(local_records)
@@ -104,6 +120,10 @@ def main() -> None:
     parser.add_argument("--per-device-batch-size", type=int, default=2)
     parser.add_argument("--gradient-accumulation-steps", type=int, default=2)
     parser.add_argument("--num-generations", type=int, default=4)
+    parser.add_argument("--epsilon", type=float, default=0.2)
+    parser.add_argument("--epsilon-high", type=float, default=None)
+    parser.add_argument("--overlong-buffer", type=int, default=256)
+    parser.add_argument("--overlong-penalty", type=float, default=1.0)
     parser.add_argument("--resume-from-checkpoint", default=None)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--model", default=None)
@@ -132,6 +152,13 @@ def main() -> None:
         "dapo": "dapo",
     }[args.loss_type]
     scale_rewards = args.loss_type != "dr_grpo"
+    if args.overlong_buffer < 0 or args.overlong_buffer >= args.max_completion_length:
+        parser.error("--overlong-buffer must be in [0, max-completion-length)")
+    epsilon_high = (
+        args.epsilon_high
+        if args.epsilon_high is not None
+        else (0.28 if args.loss_type == "dapo" else args.epsilon)
+    )
 
     config = GRPOConfig(
         output_dir=args.output,
@@ -153,9 +180,11 @@ def main() -> None:
         temperature=0.8,
         top_p=0.95,
         beta=0.02,
+        epsilon=args.epsilon,
         loss_type=loss_type,
         scale_rewards=scale_rewards,
-        epsilon_high=0.28 if args.loss_type == "dapo" else None,
+        epsilon_high=epsilon_high,
+        ignore_data_skip=bool(args.resume_from_checkpoint),
         seed=args.seed,
         model_init_kwargs={
             "dtype": "bfloat16",
@@ -178,7 +207,14 @@ def main() -> None:
             "down_proj",
         ],
     )
-    reward_fn = RewardState(args.mode, curriculum_state, state_path)
+    reward_fn = RewardState(
+        args.mode,
+        curriculum_state,
+        state_path,
+        args.max_completion_length,
+        args.overlong_buffer,
+        args.overlong_penalty,
+    )
     reward_fn.__name__ = f"{args.mode}_reward"
     model = AutoModelForImageTextToText.from_pretrained(
         model_path,
