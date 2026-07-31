@@ -24,5 +24,5 @@ done
 wait
 
 "$PYTHON" -m llm_rl.merge_eval_shards \
-    --input "$OUTPUT/shards/shard-*/base/predictions.jsonl" \
-    --output "$OUTPUT/base"
+    --input "$OUTPUT/shards/shard-*/*/predictions.jsonl" \
+    --output "$OUTPUT/merged"
