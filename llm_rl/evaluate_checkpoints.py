@@ -206,6 +206,8 @@ def main() -> None:
     parser.add_argument("--split", default="eval")
     parser.add_argument("--output", default="results/math_eval")
     parser.add_argument("--limit", type=int, default=None)
+    parser.add_argument("--shard-index", type=int, default=0)
+    parser.add_argument("--num-shards", type=int, default=1)
     parser.add_argument("--samples", type=int, default=1)
     parser.add_argument("--max-new-tokens", type=int, default=1024)
     parser.add_argument("--temperature", type=float, default=0.0)
@@ -218,12 +220,19 @@ def main() -> None:
     args = parser.parse_args()
     if args.samples < 1:
         parser.error("--samples must be at least 1")
+    if args.num_shards < 1 or not 0 <= args.shard_index < args.num_shards:
+        parser.error("--shard-index must be in [0, --num-shards)")
     if args.samples > 1 and args.temperature <= 0:
         parser.error("--samples > 1 requires --temperature > 0")
 
     model_path = args.model or os.environ["TAIJI_BASIC_MODEL_PATH"]
     rows = [json.loads(line) for line in open(args.data) if line.strip()]
     rows = [row for row in rows if row.get("split") == args.split]
+    rows = [
+        row
+        for index, row in enumerate(rows)
+        if index % args.num_shards == args.shard_index
+    ]
     if args.limit is not None:
         rows = rows[: args.limit]
     if not rows:
