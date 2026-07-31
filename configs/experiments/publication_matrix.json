@@ -2,7 +2,7 @@
   "schema_version": 1,
   "seeds": [42, 31415, 271828],
   "shared": {
-    "max_steps": 1000,
+    "max_steps": 200,
     "save_steps": 50,
     "logging_steps": 1,
     "max_completion_length": 1024,
@@ -11,7 +11,7 @@
     "num_generations": 8,
     "epsilon": 0.2,
     "overlong_buffer": 256,
-    "overlong_penalty": 1.0
+    "overlong_penalty": 0.2
     ,"enable_thinking": false
   },
   "conditions": [
