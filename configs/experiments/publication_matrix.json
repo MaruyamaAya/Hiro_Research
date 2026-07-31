@@ -12,6 +12,7 @@
     "epsilon": 0.2,
     "overlong_buffer": 256,
     "overlong_penalty": 1.0
+    ,"enable_thinking": false
   },
   "conditions": [
     {"id": "g_u", "loss_type": "grpo", "mode": "outcome", "curriculum": "uniform", "dynamic_sampling": false},

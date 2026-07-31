@@ -135,6 +135,12 @@ def main() -> None:
     parser.add_argument("--resume-from-checkpoint", default=None)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--model", default=None)
+    parser.add_argument(
+        "--enable-thinking",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Use the model's explicit thinking trace. Disabled by default for bounded RL rollouts.",
+    )
     args = parser.parse_args()
     model_path = args.model or os.environ["TAIJI_BASIC_MODEL_PATH"]
     rows = [json.loads(x) for x in open(args.data) if x.strip()]
@@ -183,6 +189,7 @@ def main() -> None:
         save_total_limit=4,
         save_only_model=False,
         report_to="none",
+        chat_template_kwargs={"enable_thinking": args.enable_thinking},
         num_generations=args.num_generations,
         max_completion_length=args.max_completion_length,
         temperature=0.8,

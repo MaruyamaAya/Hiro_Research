@@ -16,6 +16,7 @@ class GenerateCommandsTest(unittest.TestCase):
         self.assertTrue(any("dapo_histdyn_seed42" in line for line in lines))
         self.assertTrue(any("--dynamic-sampling" in line for line in lines))
         self.assertTrue(any("--no-dynamic-sampling" in line for line in lines))
+        self.assertTrue(all("--no-enable-thinking" in line for line in lines))
 
 
 if __name__ == "__main__":

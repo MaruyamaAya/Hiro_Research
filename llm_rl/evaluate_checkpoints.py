@@ -86,6 +86,7 @@ def generate_one(
     temperature: float,
     top_p: float,
     seed: int,
+    enable_thinking: bool,
 ) -> tuple[str, int, bool]:
     torch.manual_seed(seed)
     if torch.cuda.is_available():
@@ -96,6 +97,7 @@ def generate_one(
         tokenize=True,
         return_dict=True,
         return_tensors="pt",
+        enable_thinking=enable_thinking,
     ).to(model.device)
     generation_kwargs: dict[str, Any] = {
         "max_new_tokens": max_new_tokens,
@@ -128,6 +130,7 @@ def evaluate_checkpoint(
     top_p: float,
     seed: int,
     device: str,
+    enable_thinking: bool,
 ) -> dict[str, Any]:
     label = checkpoint_label(checkpoint)
     output_dir = output_root / label
@@ -147,6 +150,7 @@ def evaluate_checkpoint(
                     temperature,
                     top_p,
                     sample_seed,
+                    enable_thinking,
                 )
                 verification = verify_answer(text, row["answer"])
                 record = {
@@ -183,6 +187,7 @@ def evaluate_checkpoint(
             "temperature": temperature,
             "top_p": top_p,
             "base_seed": seed,
+            "enable_thinking": enable_thinking,
         }
     )
     with (output_dir / "summary.json").open("w") as handle:
@@ -213,6 +218,11 @@ def main() -> None:
     parser.add_argument("--temperature", type=float, default=0.0)
     parser.add_argument("--top-p", type=float, default=0.95)
     parser.add_argument("--seed", type=int, default=20260730)
+    parser.add_argument(
+        "--enable-thinking",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+    )
     parser.add_argument(
         "--device",
         default="cuda:0" if torch.cuda.is_available() else "cpu",
@@ -255,6 +265,7 @@ def main() -> None:
                 top_p=args.top_p,
                 seed=args.seed,
                 device=args.device,
+                enable_thinking=args.enable_thinking,
             )
         )
     with (output_root / "all_summaries.json").open("w") as handle:
