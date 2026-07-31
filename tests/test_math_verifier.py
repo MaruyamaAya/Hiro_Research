@@ -87,6 +87,14 @@ class MathVerifierTest(unittest.TestCase):
         self.assertTrue(answers_equivalent(r"90^\circ", "90"))
         self.assertTrue(answers_equivalent(r"\$36", "36"))
 
+    def test_visible_answer_after_think_has_priority(self) -> None:
+        result = verify_answer(
+            "<think>Maybe <answer>3</answer></think>\n<answer>4</answer>",
+            4,
+        )
+        self.assertEqual(result.status, VerificationStatus.CORRECT)
+        self.assertEqual(result.source, "answer_tag_visible")
+
     def test_answer_tag_has_priority_over_reasoning_box(self) -> None:
         candidates, source = extract_answer_candidates(
             r"Intermediate \boxed{3}; <answer>4</answer>"

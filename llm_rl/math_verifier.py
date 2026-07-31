@@ -102,6 +102,17 @@ def extract_answer_candidates(text: str) -> tuple[list[str], str | None]:
     numbers copied from the prompt or intermediate calculations.
     """
 
+    # Reasoning models may mention candidate/format examples inside a <think>
+    # trace. If an explicit answer exists after the final </think>, score only
+    # that visible answer region; otherwise fall back to the full completion.
+    if "</think>" in text:
+        visible_text = text.rsplit("</think>", 1)[-1]
+        visible_tagged = [
+            x.strip() for x in _ANSWER_TAG_RE.findall(visible_text) if x.strip()
+        ]
+        if visible_tagged:
+            return visible_tagged, "answer_tag_visible"
+
     tagged = [x.strip() for x in _ANSWER_TAG_RE.findall(text) if x.strip()]
     if tagged:
         return tagged, "answer_tag"
