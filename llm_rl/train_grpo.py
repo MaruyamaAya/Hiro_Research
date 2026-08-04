@@ -123,6 +123,7 @@ def main() -> None:
     parser.add_argument("--output", required=True)
     parser.add_argument("--max-steps", type=int, default=200)
     parser.add_argument("--save-steps", type=int, default=10)
+    parser.add_argument("--save-total-limit", type=int, default=50)
     parser.add_argument("--logging-steps", type=int, default=1)
     parser.add_argument("--max-completion-length", type=int, default=96)
     parser.add_argument("--per-device-batch-size", type=int, default=2)
@@ -186,7 +187,7 @@ def main() -> None:
         gradient_checkpointing_kwargs={"use_reentrant": False},
         logging_steps=args.logging_steps,
         save_steps=args.save_steps,
-        save_total_limit=4,
+        save_total_limit=args.save_total_limit,
         save_only_model=False,
         report_to="none",
         chat_template_kwargs={"enable_thinking": args.enable_thinking},

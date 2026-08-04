@@ -53,6 +53,8 @@ Every optimizer/checkpoint interval records:
 ## Evaluation
 
 Evaluate base and every saved checkpoint with identical prompts and seed lists.
+The run configuration retains all planned checkpoints (`save_total_limit=50`)
+so validation selection cannot silently discard early learning-curve points.
 Report:
 
 - pass@1 and empirical pass@k;
