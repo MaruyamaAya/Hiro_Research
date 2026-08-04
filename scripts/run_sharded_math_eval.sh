@@ -23,6 +23,26 @@ for device in {0..7}; do
 done
 wait
 
-"$PYTHON" -m llm_rl.merge_eval_shards \
-    --input "$OUTPUT/shards/shard-*/*/predictions.jsonl" \
-    --output "$OUTPUT/merged"
+mapfile -t labels < <(
+    find "$OUTPUT/shards/shard-0" -mindepth 1 -maxdepth 1 -type d \
+        -exec basename {} \; | sort
+)
+if [[ "${#labels[@]}" -eq 0 ]]; then
+    echo "No completed checkpoint labels found in shard-0" >&2
+    exit 1
+fi
+
+summaries=()
+for label in "${labels[@]}"; do
+    "$PYTHON" -m llm_rl.merge_eval_shards \
+        --input "$OUTPUT/shards/shard-*/$label/predictions.jsonl" \
+        --output "$OUTPUT/$label"
+    summaries+=("$OUTPUT/$label/summary.json")
+done
+
+"$PYTHON" - "${summaries[@]}" >"$OUTPUT/all_summaries.json" <<'PY'
+import json
+import sys
+
+print(json.dumps([json.load(open(path)) for path in sys.argv[1:]], indent=2))
+PY
